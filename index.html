@@ -123,7 +123,7 @@ const ed=closet.find(i=>i.id===editing);
 if(ed)h+=`<div class="add" id="edit"><b>Edit piece</b>${form(ed.type,ed.styles)}<button class="btn" id="sv">Save</button>${aiOn()?'<button class="btn alt" id="rr">Re-read with AI</button>':''}<button class="btn alt" id="cn">Cancel</button></div>`;
 else h+=`<div class="add" id="addbox"><b>Add a piece</b>${aiOn()?'<p class="hint">The AI reads each photo and decides the type, style, pattern and color for you.</p>':form("tee",["casual"])}<input type="file" id="file" accept="image/*" multiple hidden><button class="btn" id="pickf">📷 Take or choose photos</button><p class="hint" id="msg">Tip: plain background, item filling the frame. Tap a photo later to change its type or style. If you add a shirt, add the T-shirt you wear under it too.</p></div>`;
 if(!closet.length)h+=`<div class="empty">Your closet is empty.</div>`;
-for(const t in TYPES){const L=closet.filter(i=>i.type===t);if(!L.length)continue;h+=`<div class="cat">${TYPES[t]} (${L.length})</div><div class="grid">${L.map(i=>`<div class="item"><img src="${i.img}" data-e="${i.id}" alt=""><button class="x" data-id="${i.id}" aria-label="Remove">×</button><div class="lab"><span class="sw" style="background:rgb(${i.c.r},${i.c.g},${i.c.b})"></span><span>${i.desc||i.name}</span>${i.styles.map(s=>`<span class="tag">${STYLES[s]}</span>`).join("")}</div></div>`).join("")}</div>`}
+for(const t in TYPES){const L=closet.filter(i=>i.type===t);if(!L.length)continue;h+=`<div class="cat">${TYPES[t]} (${L.length})</div><div class="grid">${L.map(i=>`<div class="item"><img src="${i.img}" data-e="${i.id}" alt=""><button class="x" data-id="${i.id}" aria-label="Remove">×</button><div class="lab"><span class="sw" style="background:rgb(${i.c.r},${i.c.g},${i.c.b})"></span><span>${esc(i.desc||i.name)}</span>${i.styles.map(s=>`<span class="tag">${STYLES[s]}</span>`).join("")}</div></div>`).join("")}</div>`}
 v.innerHTML=h;
 if(ed){$("#sv").onclick=()=>{Object.assign(ed,readForm($("#edit")));editing=null;save();current=null;seen=new Set();renderCloset()};$("#cn").onclick=()=>{editing=null;renderCloset()};if($("#rr"))$("#rr").onclick=async()=>{$("#rr").textContent="Reading…";try{apply(ed,await ai(ed.img));save();renderCloset()}catch(e){$("#rr").textContent="Failed: "+e.message}}}
 else{$("#pickf").onclick=()=>$("#file").click();
@@ -133,6 +133,7 @@ save();current=null;seen=new Set();renderCloset()}}
 v.querySelectorAll("[data-e]").forEach(b=>b.onclick=()=>{editing=b.dataset.e;renderCloset();scrollTo(0,0)});
 v.querySelectorAll(".x").forEach(b=>b.onclick=()=>{closet=closet.filter(i=>i.id!==b.dataset.id);save();current=null;renderCloset()})}
 
+const esc=t=>String(t).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
 const hasKey=()=>{try{return !!localStorage.getItem("outfitKey")}catch(e){return false}};
 const HEX=/^#[0-9a-fA-F]{6}$/;
 const hasLocal=()=>{try{return localStorage.getItem("outfitLocal")==="1"}catch(e){return false}};
@@ -157,7 +158,7 @@ body:JSON.stringify({model:"claude-haiku-5-5",max_tokens:300,messages:[{role:"us
 if(!r.ok)throw new Error("HTTP "+r.status);const d=await r.json();const t=(d.content||[]).map(x=>x.text||"").join("");const m=t.match(/\{[\s\S]*\}/);if(!m)throw new Error("bad reply");return JSON.parse(m[0])}
 function apply(it,r){if(TYPES[r.type])it.type=r.type;const st=(r.styles||[]).filter(x=>STYLES[x]);it.styles=st.length?st:["casual"];
 if(HEX.test(r.color||"")){const v=parseInt(r.color.slice(1),16),R=v>>16,G=(v>>8)&255,B=v&255;it.c={r:R,g:G,b:B,...rgb2hsl(R,G,B)};it.name=colorName(it.c)}
-it.pattern=["plain","striped","checked","printed"].includes(r.pattern)?r.pattern:"plain";it.warm=["light","medium","warm"].includes(r.warmth)?r.warmth:"medium";if(r.desc)it.desc=String(r.desc).slice(0,40)}
+it.pattern=["plain","striped","checked","printed"].includes(r.pattern)?r.pattern:"plain";it.warm=["light","medium","warm"].includes(r.warmth)?r.warmth:"medium";if(r.desc)it.desc=String(r.desc).replace(/[^\p{L}\p{N} \-']/gu,"").slice(0,40)}
 function renderSettings(){const k=hasKey();$("#v3").innerHTML=`<div class="add"><b>Claude photo reading (paid, most accurate)</b>
 <p class="hint">Paste your Anthropic API key so Claude can look at each photo you add and decide if it is casual, smart or sporty, plus the type, color, pattern and warmth.</p>
 <p class="hint">Get a key: console.anthropic.com → add a few dollars of credit → API keys → Create key. Set a monthly spending limit there too.</p>
