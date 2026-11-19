@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Morning Outfit</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#faf7f2;--card:#fff;--ink:#222;--mute:#777;--line:#e6e0d6;--acc:#2f6f5e;--accink:#fff}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17191a;--card:#222527;--ink:#f0ede8;--mute:#9a9a96;--line:#34383a;--acc:#6fc4ad;--accink:#10201b;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#17191a;--card:#222527;--ink:#f0ede8;--mute:#9a9a96;--line:#34383a;--acc:#6fc4ad;--accink:#10201b;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0 auto;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;max-width:520px;padding:16px}
+h1{font-size:22px;margin:4px 0 12px}
+.tabs,.chips{display:flex;gap:8px;margin-bottom:14px}
+.tabs button,.chips button{flex:1;padding:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;font-size:15px}
+.chips button{padding:8px 4px;font-size:14px;border-radius:20px}
+.tabs button.on,.chips button.on{background:var(--acc);color:var(--accink);border-color:var(--acc)}
+.btn{display:block;width:100%;padding:14px;border:0;border-radius:12px;background:var(--acc);color:var(--accink);font-size:16px;font-weight:600;margin-top:10px}
+.btn.alt{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.item{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;position:relative}
+.item img{width:100%;aspect-ratio:1;object-fit:cover;display:block}
+.item .lab{padding:6px 8px;font-size:13px;color:var(--mute);display:flex;align-items:center;gap:6px}
+.sw{width:14px;height:14px;border-radius:50%;border:1px solid var(--line);flex:none}
+.x{position:absolute;top:6px;right:6px;background:rgba(0,0,0,.55);color:#fff;border:0;border-radius:50%;width:26px;height:26px;font-size:15px}
+.cat{margin:14px 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute)}
+.add{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:16px}
+.opts{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:6px 0 10px}
+.opts label{border:1px solid var(--line);border-radius:10px;padding:8px 2px;text-align:center;font-size:13px;cursor:pointer}
+.opts input{display:none}
+.opts label:has(input:checked){border-color:var(--acc);color:var(--acc);font-weight:700}
+.hint{color:var(--mute);font-size:14px}
+.sub{font-size:13px;color:var(--mute);margin-top:6px}
+.stack{display:flex;flex-direction:column;gap:10px}
+.stack .item{display:flex;align-items:center}
+.stack .item img{width:96px;height:96px;aspect-ratio:auto}
+.stack .lab{font-size:15px;color:var(--ink);flex-wrap:wrap}
+.empty{text-align:center;color:var(--mute);padding:24px 10px}
+.inp{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font-size:16px}.tag{font-size:11px;border:1px solid var(--line);border-radius:8px;padding:0 6px;color:var(--mute)}
+</style>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2f6f5e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Outfit">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+</head>
+<body>
+<h1>👕 Morning Outfit</h1>
+<div class="tabs"><button id="t1" class="on">Today</button><button id="t2">My closet</button><button id="t3">⚙︎ AI</button></div>
+<div id="v1"></div>
+<div id="v2" hidden></div>
+<div id="v3" hidden></div>
+<script>
+const TYPES={tee:"T-shirt",shirt:"Shirt / sweater",bottom:"Bottom",shorts:"Shorts",shoes:"Shoes",jacket:"Jacket"};
+const STYLES={casual:"Casual",smart:"Smart",sporty:"Sporty"};
+let closet=[],db=null,style="any",editing=null,current=null,seen=new Set(),weather="mild",rain=false;
+const sv2=()=>{try{localStorage.setItem("outfitW",JSON.stringify({weather}))}catch(e){}};
+try{const w=JSON.parse(localStorage.getItem("outfitW"));if(w&&w.weather)weather=w.weather}catch(e){}
+const $=s=>document.querySelector(s),rnd=a=>a[Math.floor(Math.random()*a.length)];
+
+function openDB(){return new Promise(res=>{try{const r=indexedDB.open("outfit",1);r.onupgradeneeded=()=>r.result.createObjectStore("k");r.onsuccess=()=>res(r.result);r.onerror=()=>res(null)}catch(e){res(null)}})}
+async function load(){db=await openDB();if(db)await new Promise(res=>{try{const q=db.transaction("k").objectStore("k").get("closet");q.onsuccess=()=>{closet=q.result||[];res()};q.onerror=()=>res()}catch(e){res()}});
+closet.forEach(i=>{if(i.type==="top")i.type="tee";if(!i.styles)i.styles=["casual"]})}
+function save(){try{if(db)db.transaction("k","readwrite").objectStore("k").put(closet,"closet")}catch(e){}}
+
+function readImage(file){return new Promise((res,rej)=>{const img=new Image();img.onload=()=>{const m=480,s=Math.min(1,m/Math.max(img.width,img.height));const c=document.createElement("canvas");c.width=img.width*s;c.height=img.height*s;c.getContext("2d").drawImage(img,0,0,c.width,c.height);res({url:c.toDataURL("image/jpeg",.8),canvas:c})};img.onerror=rej;img.src=URL.createObjectURL(file)})}
+function rgb2hsl(r,g,b){r/=255;g/=255;b/=255;const M=Math.max(r,g,b),m=Math.min(r,g,b),l=(M+m)/2;let h=0,s=0;if(M!==m){const d=M-m;s=l>.5?d/(2-M-m):d/(M+m);h=M===r?(g-b)/d+(g<b?6:0):M===g?(b-r)/d+2:(r-g)/d+4;h*=60}return{h,s,l}}
+function dominant(canvas){const n=40,c=document.createElement("canvas");c.width=c.height=n;const x=c.getContext("2d");x.drawImage(canvas,0,0,n,n);const d=x.getImageData(0,0,n,n).data,bins={};
+for(let i=0;i<n;i++)for(let j=0;j<n;j++){const dx=(j-n/2)/(n/2),dy=(i-n/2)/(n/2),w=Math.max(0,1-Math.hypot(dx,dy)*.9);if(w<=0)continue;const k=(i*n+j)*4,p=rgb2hsl(d[k],d[k+1],d[k+2]);
+const key=p.s<.15||p.l<.12||p.l>.9?"n"+Math.round(p.l*5):Math.round(p.h/20)+"_"+Math.round(p.s*2)+"_"+Math.round(p.l*3);
+const B=bins[key]=bins[key]||{w:0,r:0,g:0,b:0};B.w+=w;B.r+=d[k]*w;B.g+=d[k+1]*w;B.b+=d[k+2]*w}
+let best=null;for(const k in bins)if(!best||bins[k].w>best.w)best=bins[k];
+const r=Math.round(best.r/best.w),g=Math.round(best.g/best.w),b=Math.round(best.b/best.w);return{r,g,b,...rgb2hsl(r,g,b)}}
+function colorName(c){const{h,s,l}=c;if(l<.14)return"black";if(l>.9)return"white";if(s<.15)return l<.35?"dark gray":l>.7?"light gray":"gray";
+if(h>=20&&h<50&&s<.5&&l>.55)return"beige";if(h>=15&&h<45&&l<.4)return"brown";if(h>=200&&h<250&&l<.3)return"navy";
+const n=h<15||h>=345?"red":h<40?"orange":h<65?"yellow":h<165?"green":h<200?"teal":h<255?"blue":h<290?"purple":"pink";return(l>.72?"light ":l<.3?"dark ":"")+n}
+function isNeutral(c){const{h,s,l}=c;return s<.15||l<.14||l>.9||(h>=200&&h<250&&l<.3)||(h>=15&&h<50&&s<.5&&(l<.4||l>.55))}
+
+function pairScore(a,b){const na=isNeutral(a),nb=isNeutral(b);if(na&&nb)return Math.abs(a.l-b.l)>.15||a.l<.2?2:.8;
+if(na||nb)return 2;let d=Math.abs(a.h-b.h);d=Math.min(d,360-d);let sc=0;if(d<30)sc=1.6;else if(d>150)sc=1.4;else if(d>100&&d<140)sc=.6;
+if(a.s>.6&&b.s>.6)sc-=1;return sc}
+function outfitScore(o){const items=Object.values(o),cols=items.map(i=>i.c);let sc=0;
+for(let i=0;i<cols.length;i++)for(let j=i+1;j<cols.length;j++)sc+=pairScore(cols[i],cols[j]);
+const loud=cols.filter(c=>!isNeutral(c)&&c.s>.5).length;if(loud>1)sc-=1.5*(loud-1);
+if(o.shoes&&!isNeutral(o.shoes.c))sc-=.7;
+const pat=items.filter(i=>i.pattern&&i.pattern!=="plain").length;if(pat>1)sc-=2*(pat-1);items.forEach(i=>{const w=i.warm||"medium";if(weather==="cold"){if(w==="warm")sc+=.7;if(w==="light")sc-=.8}else if(weather==="hot"){if(w==="light")sc+=.5;if(w==="warm")sc-=1.2}});
+let common=Object.keys(STYLES);items.forEach(i=>common=common.filter(s=>i.styles.includes(s)));if(!common.length)sc-=4;
+const now=Date.now();items.forEach(i=>{if(i.worn){const dd=(now-i.worn)/864e5;if(dd<4)sc-=(4-dd)*.8}});
+return sc+Math.random()*.6}
+function pool(t){return closet.filter(i=>i.type===t&&(style==="any"||i.styles.includes(style)))}
+function bottoms(){const L=pool("bottom"),S=pool("shorts");let r;if(weather==="hot")r=S.length?S:L;else if(weather==="warm")r=[...L,...S];else r=L.length?L:S;if(rain&&L.length&&weather!=="hot")r=L;return r}
+function missing(){const m=[];if(!pool("tee").length&&!pool("shirt").length)m.push("a top (T-shirt or shirt)");if(!bottoms().length)m.push("a bottom (pants or shorts)");if(!pool("shoes").length)m.push("shoes");return m}
+function pick(){const T=pool("tee"),S=pool("shirt"),B=bottoms(),F=pool("shoes"),J=pool("jacket");const list=[];const W={cold:[.9,1],mild:[.5,.4],warm:[.15,0],hot:[0,0]}[weather];let pS=W[0],pJ=W[1];if(rain&&weather!=="hot")pJ=1;
+for(let n=0;n<250;n++){const o={bottom:rnd(B),shoes:rnd(F)};
+if(S.length&&(!T.length||Math.random()<pS)){o.shirt=rnd(S);if(T.length)o.tee=rnd(T)}else o.tee=rnd(T);
+if(J.length&&Math.random()<pJ)o.jacket=rnd(J);
+const key=Object.values(o).map(i=>i.id).sort().join();if(seen.has(key))continue;list.push({o,key,s:outfitScore(o)})}
+list.sort((a,b)=>b.s-a.s);return list[0]||null}
+
+function chip(i,label){return`<div class="item"><img src="${i.img}" alt=""><div class="lab"><span class="sw" style="background:rgb(${i.c.r},${i.c.g},${i.c.b})"></span><span>${label} · ${i.name}</span></div></div>`}
+function renderToday(){const v=$("#v1");
+const chips=`<div class="chips">${[["any","Any"],...Object.entries(STYLES)].map(([k,l])=>`<button data-s="${k}" class="${style===k?"on":""}">${l}</button>`).join("")}</div>`;
+const wchips=`<div class="chips">${[["cold","❄️ Cold"],["mild","🌤 Mild"],["warm","☀️ Warm"],["hot","🔥 Hot"]].map(([k,l])=>`<button data-w="${k}" class="${weather===k?"on":""}">${l}</button>`).join("")}</div><div class="chips"><button data-r="1" class="${rain?"on":""}">🌧 Rain today</button></div>`;const m=missing();
+if(m.length){v.innerHTML=wchips+chips+`<div class="empty">Not enough ${style==="any"?"":STYLES[style].toLowerCase()+" "}pieces yet. You still need ${m.join(", ")}.</div><button class="btn" id="go">Go to my closet</button>`;$("#go").onclick=()=>tab(2)}
+else{if(!current)current=pick();if(!current){seen=new Set();current=pick()}
+seen.add(current.key);const o=current.o,L={jacket:"Jacket",shirt:"Shirt / sweater",tee:o.shirt?"Inner T-shirt":"T-shirt",bottom:o.bottom.type==="shorts"?"Shorts":"Bottom",shoes:"Shoes"};
+v.innerHTML=wchips+chips+`<div class="stack">${["jacket","shirt","tee","bottom","shoes"].filter(k=>o[k]).map(k=>chip(o[k],L[k])).join("")}</div>
+<button class="btn" id="wear">I’ll wear this ✓</button><button class="btn alt" id="shuf">Show me another</button>`;
+$("#shuf").onclick=()=>{current=null;renderToday()};
+$("#wear").onclick=()=>{const t=Date.now();Object.values(o).forEach(i=>{const x=closet.find(y=>y.id===i.id);if(x)x.worn=t});save();$("#wear").textContent="Enjoy your day! 🎉";$("#wear").disabled=true}}
+v.querySelectorAll("[data-s]").forEach(b=>b.onclick=()=>{style=b.dataset.s;current=null;seen=new Set();renderToday()});v.querySelectorAll("[data-w]").forEach(b=>b.onclick=()=>{weather=b.dataset.w;sv2();current=null;seen=new Set();renderToday()});v.querySelectorAll("[data-r]").forEach(b=>b.onclick=()=>{rain=!rain;current=null;seen=new Set();renderToday()})}
+
+function form(type,styles){return`<div class="sub">What is it?</div><div class="opts">${Object.entries(TYPES).map(([k,l])=>`<label><input type="radio" name="type" value="${k}" ${k===type?"checked":""}>${l}</label>`).join("")}</div>
+<div class="sub">Style (pick one or more)</div><div class="opts">${Object.entries(STYLES).map(([k,l])=>`<label><input type="checkbox" name="style" value="${k}" ${styles.includes(k)?"checked":""}>${l}</label>`).join("")}</div>`}
+function readForm(root){const t=root.querySelector("input[name=type]:checked").value;let s=[...root.querySelectorAll("input[name=style]:checked")].map(x=>x.value);if(!s.length)s=["casual"];return{type:t,styles:s}}
+
+function renderCloset(){const v=$("#v2");let h="";
+const ed=closet.find(i=>i.id===editing);
+if(ed)h+=`<div class="add" id="edit"><b>Edit piece</b>${form(ed.type,ed.styles)}<button class="btn" id="sv">Save</button>${aiOn()?'<button class="btn alt" id="rr">Re-read with AI</button>':''}<button class="btn alt" id="cn">Cancel</button></div>`;
+else h+=`<div class="add" id="addbox"><b>Add a piece</b>${aiOn()?'<p class="hint">The AI reads each photo and decides the type, style, pattern and color for you.</p>':form("tee",["casual"])}<input type="file" id="file" accept="image/*" multiple hidden><button class="btn" id="pickf">📷 Take or choose photos</button><p class="hint" id="msg">Tip: plain background, item filling the frame. Tap a photo later to change its type or style. If you add a shirt, add the T-shirt you wear under it too.</p></div>`;
+if(!closet.length)h+=`<div class="empty">Your closet is empty.</div>`;
+for(const t in TYPES){const L=closet.filter(i=>i.type===t);if(!L.length)continue;h+=`<div class="cat">${TYPES[t]} (${L.length})</div><div class="grid">${L.map(i=>`<div class="item"><img src="${i.img}" data-e="${i.id}" alt=""><button class="x" data-id="${i.id}" aria-label="Remove">×</button><div class="lab"><span class="sw" style="background:rgb(${i.c.r},${i.c.g},${i.c.b})"></span><span>${i.desc||i.name}</span>${i.styles.map(s=>`<span class="tag">${STYLES[s]}</span>`).join("")}</div></div>`).join("")}</div>`}
+v.innerHTML=h;
+if(ed){$("#sv").onclick=()=>{Object.assign(ed,readForm($("#edit")));editing=null;save();current=null;seen=new Set();renderCloset()};$("#cn").onclick=()=>{editing=null;renderCloset()};if($("#rr"))$("#rr").onclick=async()=>{$("#rr").textContent="Reading…";try{apply(ed,await ai(ed.img));save();renderCloset()}catch(e){$("#rr").textContent="Failed: "+e.message}}}
+else{$("#pickf").onclick=()=>$("#file").click();
+$("#file").onchange=async e=>{
+const k=aiOn(),f0=k?{type:"tee",styles:["casual"]}:readForm($("#addbox")),files=[...e.target.files];let bad=0,n=0;for(const f of files){n++;$("#msg").textContent=(k?"AI is reading photo ":"Adding photo ")+n+" of "+files.length+"…";try{const{url,canvas}=await readImage(f);const c=dominant(canvas);const it={id:Date.now()+Math.random().toString(36).slice(2,6),...f0,pattern:"plain",warm:"medium",img:url,c,name:colorName(c)};if(k){try{apply(it,await ai(url))}catch(er){bad++}}closet.push(it)}catch(err){}}if(bad)alert(bad+" photo(s) could not be read by the AI. They were added as casual T-shirts: tap them to fix.");
+save();current=null;seen=new Set();renderCloset()}}
+v.querySelectorAll("[data-e]").forEach(b=>b.onclick=()=>{editing=b.dataset.e;renderCloset();scrollTo(0,0)});
+v.querySelectorAll(".x").forEach(b=>b.onclick=()=>{closet=closet.filter(i=>i.id!==b.dataset.id);save();current=null;renderCloset()})}
+
+const hasKey=()=>{try{return !!localStorage.getItem("outfitKey")}catch(e){return false}};
+const HEX=/^#[0-9a-fA-F]{6}$/;
+const hasLocal=()=>{try{return localStorage.getItem("outfitLocal")==="1"}catch(e){return false}};
+const aiOn=()=>hasKey()||hasLocal();
+const ai=d=>hasKey()?analyze(d):analyzeLocal(d);
+const CLS=[["a t-shirt","tee","light",["casual"]],["a polo shirt","tee","light",["casual","smart"]],["a button-up shirt","shirt","medium",["smart","casual"]],["a sweater","shirt","warm",["casual"]],["a hoodie","shirt","warm",["casual","sporty"]],["a pair of jeans","bottom","medium",["casual"]],["a pair of trousers","bottom","medium",["smart"]],["a pair of shorts","shorts","light",["casual"]],["a skirt","bottom","light",[]],["a pair of sneakers","shoes","medium",["casual","sporty"]],["a pair of dress shoes","shoes","medium",["smart"]],["a pair of boots","shoes","warm",["casual"]],["a jacket","jacket","warm",["casual"]],["a blazer","jacket","medium",["smart"]],["a coat","jacket","warm",["smart","casual"]]];
+function getClf(onp){if(!window._clf){window._clf=(async()=>{const T=await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.1");T.env.allowLocalModels=false;return T.pipeline("zero-shot-image-classification","Xenova/clip-vit-base-patch32",{progress_callback:onp||(()=>{})})})().catch(e=>{window._clf=null;throw e})}return window._clf}
+async function analyzeLocal(dataUrl){const clf=await getClf();
+const t=await clf(dataUrl,CLS.map(c=>c[0]));const best=CLS.find(c=>c[0]===t[0].label)||CLS[0];
+const sl=await clf(dataUrl,["casual","formal and smart","sporty and athletic"],{hypothesis_template:"This clothing item looks {}."});
+const sm={"casual":"casual","formal and smart":"smart","sporty and athletic":"sporty"};
+const styles=new Set();if(best[3][0])styles.add(best[3][0]);styles.add(sm[sl[0].label]);if(sl[1]&&sl[1].score>.3)styles.add(sm[sl[1].label]);
+const pl=await clf(dataUrl,["plain and solid colored","striped","checkered plaid","covered in a printed graphic"],{hypothesis_template:"This garment is {}."});
+const pm={"plain and solid colored":"plain","striped":"striped","checkered plaid":"checked","covered in a printed graphic":"printed"};
+const pattern=pl[0].label!=="plain and solid colored"&&pl[0].score>.6?pm[pl[0].label]:"plain";
+return{type:best[1],styles:[...styles],pattern,warmth:best[2],desc:best[0].replace(/^an? (pair of )?/,"")}}
+
+const PROMPT='This is a photo of one clothing item (a garment or a pair of shoes). Reply with ONLY a JSON object, no other text: {"type":"tee|shirt|bottom|shorts|shoes|jacket","styles":["casual","smart","sporty"],"color":"#rrggbb","pattern":"plain|striped|checked|printed","warmth":"light|medium|warm","desc":"3 to 5 word description"}. "styles" holds one or more of casual, smart, sporty. Type guide: tee = T-shirt, polo or tank top; shirt = button-up shirt, sweater, hoodie or cardigan worn over a tee; bottom = long pants, jeans or skirt; shorts; shoes; jacket = coat, blazer or outer jacket. "color" is the main color of the item as a hex code.';
+async function analyze(dataUrl){const key=localStorage.getItem("outfitKey");
+const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"content-type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+body:JSON.stringify({model:"claude-haiku-5-5",max_tokens:300,messages:[{role:"user",content:[{type:"image",source:{type:"base64",media_type:"image/jpeg",data:dataUrl.split(",")[1]}},{type:"text",text:PROMPT}]}]})});
+if(!r.ok)throw new Error("HTTP "+r.status);const d=await r.json();const t=(d.content||[]).map(x=>x.text||"").join("");const m=t.match(/\{[\s\S]*\}/);if(!m)throw new Error("bad reply");return JSON.parse(m[0])}
+function apply(it,r){if(TYPES[r.type])it.type=r.type;const st=(r.styles||[]).filter(x=>STYLES[x]);it.styles=st.length?st:["casual"];
+if(HEX.test(r.color||"")){const v=parseInt(r.color.slice(1),16),R=v>>16,G=(v>>8)&255,B=v&255;it.c={r:R,g:G,b:B,...rgb2hsl(R,G,B)};it.name=colorName(it.c)}
+it.pattern=["plain","striped","checked","printed"].includes(r.pattern)?r.pattern:"plain";it.warm=["light","medium","warm"].includes(r.warmth)?r.warmth:"medium";if(r.desc)it.desc=String(r.desc).slice(0,40)}
+function renderSettings(){const k=hasKey();$("#v3").innerHTML=`<div class="add"><b>Claude photo reading (paid, most accurate)</b>
+<p class="hint">Paste your Anthropic API key so Claude can look at each photo you add and decide if it is casual, smart or sporty, plus the type, color, pattern and warmth.</p>
+<p class="hint">Get a key: console.anthropic.com → add a few dollars of credit → API keys → Create key. Set a monthly spending limit there too.</p>
+<input class="inp" id="key" type="password" placeholder="sk-ant-…" autocomplete="off"><button class="btn" id="ks">Save key</button>${k?'<p class="hint">✓ A key is saved on this phone.</p><button class="btn alt" id="kr">Remove key</button>':''}
+<p class="hint">Photos are sent to Anthropic only at the moment you add them, so that needs internet. Your key stays on this phone. Picking outfits works offline.</p></div>
+<div class="add"><b>Free AI on this phone</b><p class="hint">Downloads an image-recognition model once (roughly 100 to 200 MB, so use Wi‑Fi). After that it reads your photos with no internet and no cost. It is less accurate than Claude, so check the results and tap a photo to fix mistakes. If a Claude key is saved, Claude is used instead.</p>
+<button class="btn" id="dl">${hasLocal()?"Model ready ✓ (download again)":"Download free AI model"}</button>${hasLocal()?'<button class="btn alt" id="ld">Turn off</button>':''}<p class="hint" id="dlmsg"></p></div>`;
+$("#ks").onclick=()=>{const v=$("#key").value.trim();if(!v)return;try{localStorage.setItem("outfitKey",v)}catch(e){}renderSettings()};
+$("#dl").onclick=async()=>{$("#dl").disabled=true;$("#dlmsg").textContent="Starting download…";const seenF={};try{await getClf(p=>{const m=$("#dlmsg");if(m&&p.status==="progress"&&p.file&&p.progress!=null){m.textContent="Downloading "+p.file.split("/").pop()+" "+Math.round(p.progress)+"%"}});try{localStorage.setItem("outfitLocal","1")}catch(e){}renderSettings()}catch(e){$("#dl").disabled=false;$("#dlmsg").textContent="Failed: "+(e.message||e)+". Check your internet and try again."}};
+if($("#ld"))$("#ld").onclick=()=>{try{localStorage.removeItem("outfitLocal")}catch(e){}renderSettings()};
+if($("#kr"))$("#kr").onclick=()=>{try{localStorage.removeItem("outfitKey")}catch(e){}renderSettings()}}
+function tab(n){[1,2,3].forEach(i=>{$("#v"+i).hidden=n!==i;$("#t"+i).className=n===i?"on":""});n===1?renderToday():n===2?renderCloset():renderSettings()}
+$("#t1").onclick=()=>tab(1);$("#t2").onclick=()=>tab(2);$("#t3").onclick=()=>tab(3);
+load().then(()=>tab(closet.length?1:2));
+</script>
+<script>
+if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}))}
+try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
+</script>
+</body>
+</html>
